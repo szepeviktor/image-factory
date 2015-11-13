@@ -1,0 +1,102 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          socat
+# Required-Start:    $local_fs $time $network $named $syslog
+# Required-Stop:     $local_fs $time $network $named $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop socat a multipurpose relay
+# Description:       The socat init script will start/stop socat as specified in /etc/default/socat
+#                    Then log (FATAL, ERROR, WARN, INFO and NOTICE) in /var/log/socat.log
+### END INIT INFO
+
+# Author: Ahmad Saif <GitHub @asaif>
+
+# @TODO Rewrite: https://gist.github.com/bcap/5397674
+
+NAME="socat"
+DAEMON="/usr/bin/socat"
+PIDFILE="/var/run/socat.pid"
+SOCAT_DEFAULTS="-d -d -d -lf /var/log/socat.log"
+
+[ -x "$DAEMON" ] || exit 0
+
+[ -r /etc/default/socat.conf ] && . /etc/default/socat.conf
+
+. /lib/lsb/init-functions
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+start_socat() {
+    start-stop-daemon --oknodo --quiet --start \
+        --pidfile "$PIDFILE" \
+        --background --make-pidfile \
+        --exec "$DAEMON" -- ${SOCAT_DEFAULTS} ${OPTIONS} < /dev/null
+}
+
+stop_socat() {
+    start-stop-daemon --oknodo --quiet --stop \
+        --pidfile "$PIDFILE" \
+        --exec "$DAEMON"
+    rm -f "$PIDFILE"
+}
+
+start() {
+    start_socat
+    return $?
+}
+
+stop() {
+    for PIDFILE in $(ls "$PIDFILE" 2> /dev/null); do
+        #NAME="$(echo "$PIDFILE" | cut -c 16-)"
+        #NAME="${NAME%%.pid}"
+        NAME="$(basename --suffix=.pid "$PIDFILE")"
+        stop_socat
+    done
+}
+
+case "$1" in
+    start)
+        log_daemon_msg "Starting multipurpose relay" "$NAME"
+        if start; then
+            log_end_msg $?
+        else
+            log_end_msg $?
+        fi
+        ;;
+    stop)
+        log_daemon_msg "Stopping multipurpose relay" "$NAME"
+        if stop; then
+            log_end_msg $?
+        else
+            log_end_msg $?
+        fi
+        ;;
+    restart)
+        log_daemon_msg "Restarting multipurpose relay" "$NAME"
+        stop
+        if start; then
+            log_end_msg $?
+        else
+            log_end_msg $?
+        fi
+        ;;
+    reload|force-reload)
+        log_daemon_msg "Reloading multipurpose relay" "$NAME"
+        stop
+        if start; then
+            log_end_msg $?
+        else
+            log_end_msg $?
+        fi
+        ;;
+    status)
+        status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME" && exit 0 || exit $?
+        ;;
+    *)
+        echo "Usage: /etc/init.d/${NAME} {start|stop|restart|reload|force-reload|status}"
+        exit 3
+        ;;
+esac
+
+exit 0
