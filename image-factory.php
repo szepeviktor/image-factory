@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Image Factory
-Version: 0.2.0
+Version: 0.2.2
 Description: Advanced real-time image optimization with mozjpeg on your server.
 Plugin URI: https://github.com/szepeviktor/image-factory
 License: The MIT License (MIT)
@@ -53,16 +53,16 @@ class O1_Image_Factory {
     public function image_factory( $filename, $original = false ) {
 
         $sizes_suffix_regexp =  '/-([0-9]+)x([0-9]+)\.[a-zA-Z]+$/';
-        $socket = $this->get_socket();
+        $socket_path = $this->get_socket_path();
 
-        if ( ! file_exists( $socket ) ) {
-                error_log( '[image-factory] Socket does not exist:'
-                    . $socket
-                );
+        if ( ! file_exists( $socket_path ) ) {
+            error_log( '[image-factory] Socket does not exist:'
+                . $socket_path
+            );
 
-                return $filename;
+            return $filename;
         }
-        $factory = stream_socket_client( 'unix://' . $socket, $errno, $errstr );
+        $factory = stream_socket_client( 'unix://' . $socket_path, $errno, $errstr );
 
         if ( 0 === $errno ) {
             // Maximum processing time per size
@@ -100,27 +100,29 @@ class O1_Image_Factory {
 
     public function metadata( $metadata, $attachment_id ) {
 
-        foreach ( $metadata['sizes'] as $metasize ) {
+        if ( isset( $metadata['sizes'] ) ) {
+            foreach ( $metadata['sizes'] as $metasize ) {
 
-            $processed = false;
-            foreach ( $this->sizes as $processed_size ) {
-                // Only two equals sings ( integer == string )
-                if ( $metasize['width'] == $processed_size[0]
-                    && $metasize['height'] == $processed_size[1]
-                ) {
-                    // This size is done.
-                    $processed = true;
-                    break;
+                $processed = false;
+                foreach ( $this->sizes as $processed_size ) {
+                    // Only two equals sings ( integer == string )
+                    if ( $metasize['width'] == $processed_size[0]
+                        && $metasize['height'] == $processed_size[1]
+                    ) {
+                        // This size is done.
+                        $processed = true;
+                        break;
+                    }
                 }
-            }
 
-            if ( ! $processed ) {
-                // Record data for image optimization cron job
-                add_post_meta( $attachment_id, '_optimize', $metasize['file'] );
-                error_log( sprintf( '[image-factory] Image missed, ID: %s name: %s',
-                    $attachment_id,
-                    $metasize['file']
-                ) );
+                if ( ! $processed ) {
+                    // Record data for image optimization cron job
+                    add_post_meta( $attachment_id, '_optimize', $metasize['file'] );
+                    error_log( sprintf( '[image-factory] Image missed, ID: %s name: %s',
+                        $attachment_id,
+                        $metasize['file']
+                    ) );
+                }
             }
         }
 
@@ -167,11 +169,11 @@ class O1_Image_Factory {
      */
     public function admin_field() {
 
-        $socket = esc_attr( $this->get_socket() );
+        $socket_path = esc_attr( $this->get_socket_path() );
         $disabled = defined( 'IMAGE_FACTORY_SOCKET' ) ? ' disabled' : '';
 
         printf( '<input name="image_factory_socket" id="image_factory_socket" type="text" class="regular-text code" value="%s"%s/>',
-            $socket,
+            $socket_path,
             $disabled
         );
         printf( '<p class="description">Path to Unix domain socket <code>image-factory-worker.sh</code> listens on.</p>' );
@@ -182,15 +184,15 @@ class O1_Image_Factory {
      *
      * @return @void
      */
-    private function get_socket() {
+    private function get_socket_path() {
 
         if ( defined( 'IMAGE_FACTORY_SOCKET' ) ) {
-            $socket = IMAGE_FACTORY_SOCKET;
+            $socket_path = IMAGE_FACTORY_SOCKET;
         } else {
-            $socket = get_option( 'image_factory_socket' );
+            $socket_path = get_option( 'image_factory_socket' );
         }
 
-        return $socket;
+        return $socket_path;
     }
 }
 
